@@ -1,0 +1,4 @@
+graft bankvboa/templates
+graft bankvboa/static
+graft boa_config
+graft boa_schemas
