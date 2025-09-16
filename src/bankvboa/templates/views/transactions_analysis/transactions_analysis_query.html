@@ -1,0 +1,36 @@
+<div class="row">
+  <div>
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <h3 class="panel-title">
+          <a data-toggle="collapse" data-parent="#accordion" href="#query-interface">Query interface <span class="fa fa-angle-double-down"></span></a>
+        </h3>
+      </div>
+      <div class="panel-body panel-collapse collapse" id="query-interface">
+        <div id="transactions-analysis-query-window">
+          <form role="form" method=post action="/views/transactions-analysis">
+            <div>
+              <!-- Default values message -->
+              <div class="row">
+                <br/>
+                <p style="margin-left:20px">
+                  The default behaviour is: <br/>
+                  start: now - 30 day <br/>
+                  stop: now <br/>
+                </p>
+              </div>
+              <br/>
+              <!-- Start and stop dates -->
+              <div class="row">
+                {% include "eboa_nav/start_stop_without_operators.html" %}
+              </div>
+              <div>
+                <button id="query-submit-button" type="submit" class="btn btn-primary" style="margin-top: 12px">Query</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

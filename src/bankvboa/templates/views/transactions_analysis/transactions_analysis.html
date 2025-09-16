@@ -1,0 +1,630 @@
+{% extends "panel/index.html" %}
+{% block content %}
+<div class="row">
+  {% if "group" in data["metadata"] %}
+  <h1 class="page-header">Specific transactions analysis view for group: {{ data["metadata"]["group"] }}</h1>
+  {% elif "entity" in data["metadata"] %}
+  <h1 class="page-header">Specific transactions analysis view for entity: {{ data["metadata"]["entity"] }}</h1>
+  {% else %}
+  <h1 class="page-header">Transactions analysis view</h1>
+  {% endif %}
+</div>
+{% include "views/transactions_analysis/transactions_analysis_query.html" %}
+{% include "views/common/header.html" %}
+
+{% if data["event_groups"]["movement_events"]|length > 0 %}
+
+<!-- Include table with the inputs used to extract the relevant data shown in the view -->
+{% with source_uuids = data["sources"].keys() %}
+{% include "vboa/show_sources_data_json.html" %}
+{% endwith %}
+
+<!-- Movement events -->
+{% if data["event_groups"]["movement_events"]|length > 0 %}
+{% set movement_event_uuids = data["event_groups"]["movement_events"] %}
+{% set movement_events = data|get_events_json(movement_event_uuids) %}
+<div class="row">
+  <div class="panel panel-default">
+    <div class="panel-heading">
+      <h3 class="panel-title">Transactions covered by the reporting period</h3>
+    </div>
+    <div class="panel-body panel-collapse collapse in" id="transactions-table">
+      <div>
+        <p>
+          <b>The following table shows the transactions during the specified period</b>:
+        </p>
+        <table width="100%" class="table table-striped table-bordered table-hover table-search" id="transactions-table">
+          <thead>
+            <tr>
+              <th>Groups</th>
+              <th>Entities</th>
+              <th>Amount</th>
+              <th>Concept</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for event in movement_events %}
+            {% set values = event|get_values([{"name": {"filter": "amount","op": "=="}, "group":"amount"}, {"name": {"filter": "concept","op": "=="}, "group":"concept"}]) %}
+            {% set groups_values = event|get_values([{"name": {"filter": "group.","op": "regex"}, "group":"groups"}], False) %}
+            {% set entities_values = event|get_values([{"name": {"filter": "entity.","op": "regex"}, "group":"entities"}], False) %}
+
+            <!-- Obtain amount -->
+            {% set amount = values["amount"][0]["value"] %}
+
+            <!-- Obtain concept -->
+            {% set concept = values["concept"][0]["value"] %}
+
+            <tr>
+              <td>
+                {{ groups_values["groups"]|map(attribute="value")|join(", ") }}
+              </td>
+              <td>
+                {{ entities_values["entities"]|map(attribute="value")|join(", ") }}
+              </td>
+              <td>{{ amount }}</td>
+              <td><a href="/eboa_nav/query-event-links/{{ event.event_uuid }}">{{ concept }}</a></td>
+              <td>{{ event["start"] }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th>Groups</th>
+              <th>Entities</th>
+              <th>Amount</th>
+              <th>Concept</th>
+              <th>Date</th>
+            </tr>
+          </tfoot>
+        </table>
+        <br/>
+        <div id="data-transactions-incoming-container">
+          <p>
+            <b>The following graph shows the incoming transactions during the specified period</b>:
+          </p>
+          <div align="center" id="data-transactions-incoming"></div>
+        </div>
+        <br/>
+        <div id="data-evolution-transactions-incoming-container">
+          <p>
+            <b>The following graph shows the evolution of the incoming transactions during the specified period</b>:
+          </p>
+          <div align="center" id="data-evolution-transactions-incoming"></div>
+        </div>
+        <br/>
+        <div id="data-transactions-spending-container">
+          <p>
+            <b>The following graph shows the spending transactions during the specified period</b>:
+          </p>
+          <div align="center" id="data-transactions-spending"></div>
+        </div>
+        <br/>
+        <div id="data-evolution-transactions-spending-container">
+          <p>
+            <b>The following graph shows the evolution of the spending transactions during the specified period</b>:
+          </p>
+          <div align="center" id="data-evolution-transactions-spending"></div>
+        </div>
+        <br/>
+        <div id="data-account-evolution-container">
+          <p>
+            <b>The following graph shows the evolution of the account during the specified period</b>:
+          </p>
+          <div align="center" id="data-account-evolution"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Aggregated movements per group and per month -->
+{% if data["event_groups"]["aggregated_movements_group_month_events"]|length > 0 %}
+{% set aggregated_event_uuids = data["event_groups"]["aggregated_movements_group_month_events"] %}
+{% set aggregated_events = data|get_events_json(aggregated_event_uuids) %}
+<div class="row">
+  <div class="panel panel-default">
+    <div class="panel-heading">
+      <h3 class="panel-title">Aggregated transactions <b style="color:green">per group and per month</b></h3>
+    </div>
+    <div class="panel-body panel-collapse collapse in" id="transactions-analysis-aggregated-movements-group-month-table">
+      <div>
+        <p>
+          <b>The following table shows the aggregated transactions <b style="color:green">per group and per month</b> during the specified period</b>:
+        </p>
+        <table width="100%" class="table table-striped table-bordered table-hover table-search" id="transactions-analysis-aggregated-movements-group-month-table">
+          <thead>
+            <tr>
+              <th>Group</th>
+              <th>Amount</th>
+              <th>Period start</th>
+              <th>Period stop</th>
+              <th>Movements</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for event in aggregated_events %}
+            {% set values = event|get_values([{"name": {"filter": "amount","op": "=="}, "group":"amount"}, {"name": {"filter": "group","op": "=="}, "group":"group"}]) %}
+
+            <!-- Obtain total amount -->
+            {% set amount = values["amount"][0]["value"] %}
+
+            <!-- Obtain group -->
+            {% set group = values["group"][0]["value"] %}
+
+            <tr>
+              <td><a href="{{ url_for('transactions_analysis.show_group_analysis') }}?reporting_start={{ data['metadata']['reporting_start'] }}&reporting_stop={{ data['metadata']['reporting_stop'] }}&group={{ group }}">{{ group }}</a></td>
+              <td>{{ amount }}</td>
+              <td>{{ event["start"] }}</td>
+              <td>{{ event["stop"] }}</td>
+              <td><a href="{{ url_for('eboa_nav.query_event_links_and_render', event_uuid=event['event_uuid']) }}"><i class="fa fa-link"></i></a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th>Group</th>
+              <th>Amount</th>
+              <th>Period start</th>
+              <th>Period stop</th>
+              <th>Movements</th>
+            </tr>
+          </tfoot>
+        </table>
+        <br/>
+        <div id="data-group-month-container">
+          <p>
+            <b>The following graph shows the balance by groups and months during the specified period</b>:
+          </p>
+          <div align="center" id="data-group-month"></div>
+        </div>
+        <br/>
+        <div id="data-accumulated-group-month-container">
+          <p>
+            <b>The following graph shows the accumulated balance by groups and months during the specified period</b>:
+          </p>
+          <div align="center" id="data-accumulated-group-month"></div>
+        </div>
+        <br/>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Aggregated movements per entity and per month -->
+{% if data["event_groups"]["aggregated_movements_entity_month_events"]|length > 0 %}
+{% set aggregated_event_uuids = data["event_groups"]["aggregated_movements_entity_month_events"] %}
+{% set aggregated_events = data|get_events_json(aggregated_event_uuids) %}
+<div class="row">
+  <div class="panel panel-default">
+    <div class="panel-heading">
+      <h3 class="panel-title">Aggregated transactions <b style="color:green">per entity and per month</b></h3>
+    </div>
+    <div class="panel-body panel-collapse collapse in" id="transactions-analysis-aggregated-movements-entity-month-table">
+      <div>
+        <p>
+          <b>The following table shows the aggregated transactions <b style="color:green">per entity and per month</b> during the specified period</b>:
+        </p>
+        <table width="100%" class="table table-striped table-bordered table-hover table-search" id="transactions-analysis-aggregated-movements-entity-month-table">
+          <thead>
+            <tr>
+              <th>Entity</th>
+              <th>Amount</th>
+              <th>Period start</th>
+              <th>Period stop</th>
+              <th>Movements</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for event in aggregated_events %}
+            {% set values = event|get_values([{"name": {"filter": "amount","op": "=="}, "group":"amount"}, {"name": {"filter": "entity","op": "=="}, "group":"entity"}]) %}
+
+            <!-- Obtain total amount -->
+            {% set amount = values["amount"][0]["value"] %}
+
+            <!-- Obtain entity -->
+            {% set entity = values["entity"][0]["value"] %}
+
+            <tr>
+              <td><a href="{{ url_for('transactions_analysis.show_entity_analysis') }}?reporting_start={{ data['metadata']['reporting_start'] }}&reporting_stop={{ data['metadata']['reporting_stop'] }}&entity={{ entity }}">{{ entity }}</a></td>
+              <td>{{ amount }}</td>
+              <td>{{ event["start"] }}</td>
+              <td>{{ event["stop"] }}</td>
+              <td><a href="{{ url_for('eboa_nav.query_event_links_and_render', event_uuid=event['event_uuid']) }}"><i class="fa fa-link"></i></a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th>Entity</th>
+              <th>Amount</th>
+              <th>Period start</th>
+              <th>Period stop</th>
+              <th>Movements</th>
+            </tr>
+          </tfoot>
+        </table>
+        <br/>
+        <div id="data-entity-month-container">
+          <p>
+            <b>The following graph shows the balance by entities and months during the specified period</b>:
+          </p>
+          <div align="center" id="data-entity-month"></div>
+        </div>
+        <br/>
+        <div id="data-accumulated-entity-month-container">
+          <p>
+            <b>The following graph shows the accumulated balance by entities and months during the specified period</b>:
+          </p>
+          <div align="center" id="data-accumulated-entity-month"></div>
+        </div>
+        <br/>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Aggregated movements per group and per year -->
+{% if data["event_groups"]["aggregated_movements_group_year_events"]|length > 0 %}
+{% set aggregated_event_uuids = data["event_groups"]["aggregated_movements_group_year_events"] %}
+{% set aggregated_events = data|get_events_json(aggregated_event_uuids) %}
+<div class="row">
+  <div class="panel panel-default">
+    <div class="panel-heading">
+      <h3 class="panel-title">Aggregated transactions <b style="color:green">per group and per year</b></h3>
+    </div>
+    <div class="panel-body panel-collapse collapse in" id="transactions-analysis-aggregated-movements-group-year-table">
+      <div>
+        <p>
+          <b>The following table shows the aggregated transactions <b style="color:green">per group and per year</b> during the specified period</b>:
+        </p>
+        <table width="100%" class="table table-striped table-bordered table-hover table-search" id="transactions-analysis-aggregated-movements-group-year-table">
+          <thead>
+            <tr>
+              <th>Group</th>
+              <th>Amount</th>
+              <th>Period start</th>
+              <th>Period stop</th>
+              <th>Movements</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for event in aggregated_events %}
+            {% set values = event|get_values([{"name": {"filter": "amount","op": "=="}, "group":"amount"}, {"name": {"filter": "group","op": "=="}, "group":"group"}]) %}
+
+            <!-- Obtain total amount -->
+            {% set amount = values["amount"][0]["value"] %}
+
+            <!-- Obtain group -->
+            {% set group = values["group"][0]["value"] %}
+
+            <tr>
+              <td><a href="{{ url_for('transactions_analysis.show_group_analysis') }}?reporting_start={{ data['metadata']['reporting_start'] }}&reporting_stop={{ data['metadata']['reporting_stop'] }}&group={{ group }}">{{ group }}</a></td>
+              <td>{{ amount }}</td>
+              <td>{{ event["start"] }}</td>
+              <td>{{ event["stop"] }}</td>
+              <td><a href="{{ url_for('eboa_nav.query_event_links_and_render', event_uuid=event['event_uuid']) }}"><i class="fa fa-link"></i></a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th>Group</th>
+              <th>Amount</th>
+              <th>Period start</th>
+              <th>Period stop</th>
+              <th>Movements</th>
+            </tr>
+          </tfoot>
+        </table>
+        <br/>
+        <div id="data-group-year-container">
+          <p>
+            <b>The following graph shows the balance by groups and years during the specified period</b>:
+          </p>
+          <div align="center" id="data-group-year"></div>
+        </div>
+        <br/>
+        <div id="data-accumulated-group-year-container">
+          <p>
+            <b>The following graph shows the accumulated balance by groups and years during the specified period</b>:
+          </p>
+          <div align="center" id="data-accumulated-group-year"></div>
+        </div>
+        <br/>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Aggregated movements per entity and per year -->
+{% if data["event_groups"]["aggregated_movements_entity_year_events"]|length > 0 %}
+{% set aggregated_event_uuids = data["event_groups"]["aggregated_movements_entity_year_events"] %}
+{% set aggregated_events = data|get_events_json(aggregated_event_uuids) %}
+<div class="row">
+  <div class="panel panel-default">
+    <div class="panel-heading">
+      <h3 class="panel-title">Aggregated transactions <b style="color:green">per entity and per year</b></h3>
+    </div>
+    <div class="panel-body panel-collapse collapse in" id="transactions-analysis-aggregated-movements-entity-year-table">
+      <div>
+        <p>
+          <b>The following table shows the aggregated transactions <b style="color:green">per entity and per year</b> during the specified period</b>:
+        </p>
+        <table width="100%" class="table table-striped table-bordered table-hover table-search" id="transactions-analysis-aggregated-movements-entity-year-table">
+          <thead>
+            <tr>
+              <th>Entity</th>
+              <th>Amount</th>
+              <th>Period start</th>
+              <th>Period stop</th>
+              <th>Movements</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for event in aggregated_events %}
+            {% set values = event|get_values([{"name": {"filter": "amount","op": "=="}, "group":"amount"}, {"name": {"filter": "entity","op": "=="}, "group":"entity"}]) %}
+
+            <!-- Obtain total amount -->
+            {% set amount = values["amount"][0]["value"] %}
+
+            <!-- Obtain entity -->
+            {% set entity = values["entity"][0]["value"] %}
+
+            <tr>
+              <td><a href="{{ url_for('transactions_analysis.show_entity_analysis') }}?reporting_start={{ data['metadata']['reporting_start'] }}&reporting_stop={{ data['metadata']['reporting_stop'] }}&entity={{ entity }}">{{ entity }}</a></td>
+              <td>{{ amount }}</td>
+              <td>{{ event["start"] }}</td>
+              <td>{{ event["stop"] }}</td>
+              <td><a href="{{ url_for('eboa_nav.query_event_links_and_render', event_uuid=event['event_uuid']) }}"><i class="fa fa-link"></i></a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th>Entity</th>
+              <th>Amount</th>
+              <th>Period start</th>
+              <th>Period stop</th>
+              <th>Movements</th>
+            </tr>
+          </tfoot>
+        </table>
+        <br/>
+        <div id="data-entity-year-container">
+          <p>
+            <b>The following graph shows the balance by entities and years during the specified period</b>:
+          </p>
+          <div align="center" id="data-entity-year"></div>
+        </div>
+        <br/>
+        <div id="data-accumulated-entity-year-container">
+          <p>
+            <b>The following graph shows the accumulated balance by entities and years during the specified period</b>:
+          </p>
+          <div align="center" id="data-accumulated-entity-year"></div>
+        </div>
+        <br/>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% else %}
+<div class="row">
+  <div>
+    <div class="panel panel-red">
+      <div class="panel-heading">
+        <h3 class="panel-title">
+          <a data-toggle="collapse" data-parent="#accordion" href="#transactions-analysis-no-data">Transactions analysis <span class="fa fa-angle-double-down"></span></a>
+        </h3>
+      </div>
+      <div class="panel-body panel-collapse" id="transactions-analysis-no-data">
+        <div class="row">
+          <p style="text-indent: 1em">There are no movements during this period.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script type="text/javascript">
+
+  {% if data["event_groups"]["movement_events"]|length > 0 %}
+  /* Data evolution of the transactions */
+  {% with event_uuids = data["event_groups"]["movement_events"] %}
+  {% include "js/transactions_analysis/transactions_analysis_data_for_transactions.js" %}
+  {% endwith %}
+
+  // Incoming transactions
+  var groups = [];
+  var items = [];
+  var options = vboa.prepare_events_data_for_xy(data_evolution["transactions_incoming"], items, groups, "Incoming transactions");
+  if (items.length > 0){
+      vboa.display_x_time("data-transactions-incoming", items, groups, options);
+  }
+  else{
+      var container = document.getElementById("data-transactions-incoming-container");
+      container.style.visibility = "hidden";
+  }
+  // Incoming evolution
+  var groups = [];
+  var items = [];
+  var options = vboa.prepare_events_data_for_xy(data_evolution["incoming_evolution"], items, groups, "Evolution of the incoming transactions");
+  if (items.length > 0){
+      vboa.display_x_time("data-evolution-transactions-incoming", items, groups, options);
+  }
+  else{
+      var container = document.getElementById("data-evolution-transactions-incoming-container");
+      container.style.visibility = "hidden";
+  }
+
+  // Spending transactions
+  var groups = [];
+  var items = [];
+  var options = vboa.prepare_events_data_for_xy(data_evolution["transactions_spending"], items, groups, "Evolution of the spending transactions");
+  if (items.length > 0){
+      vboa.display_x_time("data-transactions-spending", items, groups, options);
+  }
+  else{
+      var container = document.getElementById("data-transactions-spending-container");
+      container.style.visibility = "hidden";
+  }
+  // Spending evolution
+  var groups = [];
+  var items = [];
+  var options = vboa.prepare_events_data_for_xy(data_evolution["spending_evolution"], items, groups, "Evolution of the spending transactions");
+  if (items.length > 0){
+      vboa.display_x_time("data-evolution-transactions-spending", items, groups, options);
+  }
+  else{
+      var container = document.getElementById("data-evolution-transactions-spending-container");
+      container.style.visibility = "hidden";
+  }
+
+  // Account evolution
+  var groups = [];
+  var items = [];
+  var options = vboa.prepare_events_data_for_xy(data_evolution["account_evolution"], items, groups, "Evolution of the account");
+  if (items.length > 0){
+      vboa.display_x_time("data-account-evolution", items, groups, options);
+  }
+  else{
+      var container = document.getElementById("data-account-evolution-container");
+      container.style.visibility = "hidden";
+  }
+  {% endif %}
+
+  {% if data["event_groups"]["aggregated_movements_group_month_events"]|length > 0 %}
+  /* Data evolution by groups per month */
+  {% with event_uuids = data["event_groups"]["aggregated_movements_group_month_events"] %}
+  {% include "js/transactions_analysis/transactions_analysis_data_for_transactions_groups.js" %}
+  {% endwith %}
+
+  // Balance by groups per month
+  var groups = [];
+  var items = [];
+  var options = vboa.prepare_events_data_for_xy(data_evolution["groups_evolution"], items, groups, "Evolution of the balance by group and month");
+  if (items.length > 0){
+      vboa.display_x_time("data-group-month", items, groups, options);
+  }
+  else{
+      var container = document.getElementById("data-group-month-container");
+      container.style.visibility = "hidden";
+  }
+  // Accumulated balance by groups per month
+  var groups = [];
+  var items = [];
+  var options = vboa.prepare_events_data_for_xy(data_evolution["accumulated_groups_evolution"], items, groups, "Evolution of the accumulated balance by group and month");
+  if (items.length > 0){
+      vboa.display_x_time("data-accumulated-group-month", items, groups, options);
+  }
+  else{
+      var container = document.getElementById("data-accumulated-group-month-container");
+      container.style.visibility = "hidden";
+  }
+  {% endif %}
+
+  {% if data["event_groups"]["aggregated_movements_entity_month_events"]|length > 0 %}
+  /* Data evolution by entities per month */
+  {% with event_uuids = data["event_groups"]["aggregated_movements_entity_month_events"] %}
+  {% include "js/transactions_analysis/transactions_analysis_data_for_transactions_entities.js" %}
+  {% endwith %}
+
+  // Balance by entities per month
+  var groups = [];
+  var items = [];
+  var options = vboa.prepare_events_data_for_xy(data_evolution["entities_evolution"], items, groups, "Evolution of the balance by group and month");
+  if (items.length > 0){
+      vboa.display_x_time("data-entity-month", items, groups, options);
+  }
+  else{
+      var container = document.getElementById("data-entity-month-container");
+      container.style.visibility = "hidden";
+  }
+  // Accumulated balance by entities per month
+  var groups = [];
+  var items = [];
+  var options = vboa.prepare_events_data_for_xy(data_evolution["accumulated_entities_evolution"], items, groups, "Evolution of the accumulated balance by group and month");
+  if (items.length > 0){
+      vboa.display_x_time("data-accumulated-entity-month", items, groups, options);
+  }
+  else{
+      var container = document.getElementById("data-accumulated-entity-month-container");
+      container.style.visibility = "hidden";
+  }
+  {% endif %}
+
+  {% if data["event_groups"]["aggregated_movements_group_year_events"]|length > 0 %}
+  /* Data evolution by groups per year */
+  {% with event_uuids = data["event_groups"]["aggregated_movements_group_year_events"] %}
+  {% include "js/transactions_analysis/transactions_analysis_data_for_transactions_groups.js" %}
+  {% endwith %}
+
+  // Balance by groups per year
+  var groups = [];
+  var items = [];
+  var options = vboa.prepare_events_data_for_xy(data_evolution["groups_evolution"], items, groups, "Evolution of the balance by group and year");
+  if (items.length > 0){
+      vboa.display_x_time("data-group-year", items, groups, options);
+  }
+  else{
+      var container = document.getElementById("data-group-year-container");
+      container.style.visibility = "hidden";
+  }
+  // Accumulated balance by groups per year
+  var groups = [];
+  var items = [];
+  var options = vboa.prepare_events_data_for_xy(data_evolution["accumulated_groups_evolution"], items, groups, "Evolution of the accumulated balance by group and year");
+  if (items.length > 0){
+      vboa.display_x_time("data-accumulated-group-year", items, groups, options);
+  }
+  else{
+      var container = document.getElementById("data-accumulated-group-year-container");
+      container.style.visibility = "hidden";
+  }
+  {% endif %}
+
+  {% if data["event_groups"]["aggregated_movements_entity_year_events"]|length > 0 %}
+  /* Data evolution by entities per year */
+  {% with event_uuids = data["event_groups"]["aggregated_movements_entity_year_events"] %}
+  {% include "js/transactions_analysis/transactions_analysis_data_for_transactions_entities.js" %}
+  {% endwith %}
+
+  // Balance by entities per year
+  var groups = [];
+  var items = [];
+  var options = vboa.prepare_events_data_for_xy(data_evolution["entities_evolution"], items, groups, "Evolution of the balance by group and year");
+  if (items.length > 0){
+      vboa.display_x_time("data-entity-year", items, groups, options);
+  }
+  else{
+      var container = document.getElementById("data-entity-year-container");
+      container.style.visibility = "hidden";
+  }
+  // Accumulated balance by entities per year
+  var groups = [];
+  var items = [];
+  var options = vboa.prepare_events_data_for_xy(data_evolution["accumulated_entities_evolution"], items, groups, "Evolution of the accumulated balance by group and year");
+  if (items.length > 0){
+      vboa.display_x_time("data-accumulated-entity-year", items, groups, options);
+  }
+  else{
+      var container = document.getElementById("data-accumulated-entity-year-container");
+      container.style.visibility = "hidden";
+  }
+  {% endif %}
+  
+</script>
+{% endblock %}

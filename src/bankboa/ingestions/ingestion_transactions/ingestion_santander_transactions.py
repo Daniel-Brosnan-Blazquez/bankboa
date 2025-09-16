@@ -68,14 +68,24 @@ def _generate_movements_events(parsed_xls, source, engine, query):
     
     events = {}
     events["movements"] = []
+    current_operation_date = None
+    current_microsecond_operation_date = 0
     
     # Iterate through rows
     for index, row in parsed_xls.iterrows():
 
         operation_date = parser.parse(row["FECHA OPERACIÓN"], dayfirst=True).isoformat()
+
+        if current_operation_date != operation_date:
+            current_operation_date = operation_date
+            current_microsecond_operation_date = 0
+        else:
+            current_microsecond_operation_date += 1
+        # end if
+        
         value_date = parser.parse(row["FECHA VALOR"], dayfirst=True).isoformat()
-        start = value_date
-        stop = (parser.parse(row["FECHA VALOR"], dayfirst=True) + datetime.timedelta(days=1)).isoformat()
+        start = (parser.parse(row["FECHA OPERACIÓN"], dayfirst=True) - datetime.timedelta(microseconds=current_microsecond_operation_date)).isoformat()
+        stop = (parser.parse(row["FECHA OPERACIÓN"], dayfirst=True) - datetime.timedelta(microseconds=current_microsecond_operation_date) + datetime.timedelta(days=1)).isoformat()
         concept = row["CONCEPTO"]
         amount = float(row["IMPORTE EUR"])
         balance = float(row["SALDO"])
@@ -141,7 +151,6 @@ def _generate_movements_events(parsed_xls, source, engine, query):
                  "value": i}
             )
         # end if
-                    
             
         # Insert entities
         i = 0
@@ -153,11 +162,24 @@ def _generate_movements_events(parsed_xls, source, engine, query):
             )
             i += 1
         # end for
-        values.append(
-            {"name": "number_of_entities",
-             "type": "double",
-             "value": i}
-        )
+        if i == 0:
+            values.append(
+                {"name": "number_of_entities",
+                 "type": "double",
+                 "value": 1}
+            )
+            values.append(
+                {"name": "entity0",
+                 "type": "text",
+                 "value": "No entity"}
+            )
+        else:
+            values.append(
+                {"name": "number_of_entities",
+                 "type": "double",
+                 "value": i}
+            )
+        # end if
             
         events["movements"].append({
             "gauge": {

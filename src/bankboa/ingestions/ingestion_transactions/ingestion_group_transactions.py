@@ -69,6 +69,9 @@ def _generate_aggregated_movements_events(parsed_xls, source, engine, query):
     groups_xml = etree.parse(get_resources_path() + "/groups.xml")
     groups_xpath = etree.XPathEvaluator(groups_xml)
     movement_groups = [node.text for node in groups_xpath("/groups/group/name")]
+    entities_xml = etree.parse(get_resources_path() + "/entities.xml")
+    entities_xpath = etree.XPathEvaluator(entities_xml)
+    movement_entities = [node.text for node in entities_xpath("/entities/entity/name")]
 
     events = {}
     events["aggregated_movements_month"] = []
@@ -89,21 +92,14 @@ def _generate_aggregated_movements_events(parsed_xls, source, engine, query):
                 start_filters = [{"date": event.stop.isoformat(), "op": "<"}, {"date": event.start.isoformat(), "op": ">="}],
                 value_filters = [{"name": {"filter": "group%", "op": "like"}, "type": "text", "value": {"op": "==", "filter": group}}])
 
-            logger.info(f"There are {len(movement_events)} movements for group {group}")
-            
             if len(movement_events) == 0:
-                logger.info(f"There are no movements for group {group}")
                 continue
 
             movement_events_uuids = [event.event_uuid for event in movement_events]
             
             amounts = [amount.value for event in movement_events for amount in event.eventDoubles if amount.name == "amount"]
             
-            logger.info(f"There are {len(amounts)} movements to sum")
-            
-            total_amount = sum(amounts)
-
-            logger.info(f"Total amount is {total_amount}")
+            amount = sum(amounts)
 
             values = [
                 {"name": "bank",
@@ -112,9 +108,9 @@ def _generate_aggregated_movements_events(parsed_xls, source, engine, query):
                 {"name": "group",
                  "type": "text",
                  "value": group},
-                {"name": "total_amount",
+                {"name": "amount",
                  "type": "double",
-                 "value": total_amount}
+                 "value": amount}
             ]
 
             links = []
@@ -122,7 +118,7 @@ def _generate_aggregated_movements_events(parsed_xls, source, engine, query):
                 links.append({
                     "link": str(event_uuid),
                     "link_mode": "by_uuid",
-                    "name": "AGGRAGATED_MOVEMENTS_MONTH",
+                    "name": "AGGREGATED_MOVEMENTS_GROUP_MONTH",
                     "back_ref": "MOVEMENT"
                 })
             # end for
@@ -130,7 +126,60 @@ def _generate_aggregated_movements_events(parsed_xls, source, engine, query):
             events["aggregated_movements_month"].append({
                 "gauge": {
                     "insertion_type": "INSERT_and_ERASE",
-                    "name": "AGGRAGATED_MOVEMENTS_MONTH",
+                    "name": "AGGREGATED_MOVEMENTS_GROUP_MONTH",
+                    "system": "BANCO SANTANDER"
+                },
+                "start": event.start.isoformat(),
+                "stop": event.stop.isoformat(),
+                "values": values,
+                "links": links
+            })
+
+        # end for
+
+        # Iterate through entities
+        for entity in movement_entities + ["No entity"]:
+            
+            movement_events = query.get_events(
+                gauge_names = {"filter": "MOVEMENT", "op": "=="},
+                start_filters = [{"date": event.stop.isoformat(), "op": "<"}, {"date": event.start.isoformat(), "op": ">="}],
+                value_filters = [{"name": {"filter": "entity%", "op": "like"}, "type": "text", "value": {"op": "==", "filter": entity}}])
+
+            if len(movement_events) == 0:
+                continue
+
+            movement_events_uuids = [event.event_uuid for event in movement_events]
+            
+            amounts = [amount.value for event in movement_events for amount in event.eventDoubles if amount.name == "amount"]
+            
+            amount = sum(amounts)
+
+            values = [
+                {"name": "bank",
+                 "type": "text",
+                 "value": "BANCO SANTANDER"},
+                {"name": "entity",
+                 "type": "text",
+                 "value": entity},
+                {"name": "amount",
+                 "type": "double",
+                 "value": amount}
+            ]
+
+            links = []
+            for event_uuid in movement_events_uuids:
+                links.append({
+                    "link": str(event_uuid),
+                    "link_mode": "by_uuid",
+                    "name": "AGGREGATED_MOVEMENTS_ENTITY_MONTH",
+                    "back_ref": "MOVEMENT"
+                })
+            # end for
+
+            events["aggregated_movements_month"].append({
+                "gauge": {
+                    "insertion_type": "INSERT_and_ERASE",
+                    "name": "AGGREGATED_MOVEMENTS_ENTITY_MONTH",
                     "system": "BANCO SANTANDER"
                 },
                 "start": event.start.isoformat(),
@@ -160,22 +209,15 @@ def _generate_aggregated_movements_events(parsed_xls, source, engine, query):
                 gauge_names = {"filter": "MOVEMENT", "op": "=="},
                 start_filters = [{"date": event.stop.isoformat(), "op": "<"}, {"date": event.start.isoformat(), "op": ">="}],
                 value_filters = [{"name": {"filter": "group%", "op": "like"}, "type": "text", "value": {"op": "==", "filter": group}}])
-
-            logger.info(f"There are {len(movement_events)} movements for group {group}")
             
             if len(movement_events) == 0:
-                logger.info(f"There are no movements for group {group}")
                 continue
 
             movement_events_uuids = [event.event_uuid for event in movement_events]
             
             amounts = [amount.value for event in movement_events for amount in event.eventDoubles if amount.name == "amount"]
             
-            logger.info(f"There are {len(amounts)} movements to sum")
-            
-            total_amount = sum(amounts)
-
-            logger.info(f"Total amount is {total_amount}")
+            amount = sum(amounts)
 
             values = [
                 {"name": "bank",
@@ -184,9 +226,9 @@ def _generate_aggregated_movements_events(parsed_xls, source, engine, query):
                 {"name": "group",
                  "type": "text",
                  "value": group},
-                {"name": "total_amount",
+                {"name": "amount",
                  "type": "double",
-                 "value": total_amount}
+                 "value": amount}
             ]
 
             links = []
@@ -194,7 +236,7 @@ def _generate_aggregated_movements_events(parsed_xls, source, engine, query):
                 links.append({
                     "link": str(event_uuid),
                     "link_mode": "by_uuid",
-                    "name": "AGGRAGATED_MOVEMENTS_YEAR",
+                    "name": "AGGREGATED_MOVEMENTS_GROUP_YEAR",
                     "back_ref": "MOVEMENT"
                 })
             # end for
@@ -202,7 +244,60 @@ def _generate_aggregated_movements_events(parsed_xls, source, engine, query):
             events["aggregated_movements_year"].append({
                 "gauge": {
                     "insertion_type": "INSERT_and_ERASE",
-                    "name": "AGGRAGATED_MOVEMENTS_YEAR",
+                    "name": "AGGREGATED_MOVEMENTS_GROUP_YEAR",
+                    "system": "BANCO SANTANDER"
+                },
+                "start": event.start.isoformat(),
+                "stop": event.stop.isoformat(),
+                "values": values,
+                "links": links
+            })
+
+        # end for
+
+        # Iterate through entities
+        for entity in movement_entities + ["No entity"]:
+            
+            movement_events = query.get_events(
+                gauge_names = {"filter": "MOVEMENT", "op": "=="},
+                start_filters = [{"date": event.stop.isoformat(), "op": "<"}, {"date": event.start.isoformat(), "op": ">="}],
+                value_filters = [{"name": {"filter": "entity%", "op": "like"}, "type": "text", "value": {"op": "==", "filter": entity}}])
+
+            if len(movement_events) == 0:
+                continue
+
+            movement_events_uuids = [event.event_uuid for event in movement_events]
+            
+            amounts = [amount.value for event in movement_events for amount in event.eventDoubles if amount.name == "amount"]
+            
+            amount = sum(amounts)
+
+            values = [
+                {"name": "bank",
+                 "type": "text",
+                 "value": "BANCO SANTANDER"},
+                {"name": "entity",
+                 "type": "text",
+                 "value": entity},
+                {"name": "amount",
+                 "type": "double",
+                 "value": amount}
+            ]
+
+            links = []
+            for event_uuid in movement_events_uuids:
+                links.append({
+                    "link": str(event_uuid),
+                    "link_mode": "by_uuid",
+                    "name": "AGGREGATED_MOVEMENTS_ENTITY_YEAR",
+                    "back_ref": "MOVEMENT"
+                })
+            # end for
+
+            events["aggregated_movements_year"].append({
+                "gauge": {
+                    "insertion_type": "INSERT_and_ERASE",
+                    "name": "AGGREGATED_MOVEMENTS_ENTITY_YEAR",
                     "system": "BANCO SANTANDER"
                 },
                 "start": event.start.isoformat(),

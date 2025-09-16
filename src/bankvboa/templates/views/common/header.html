@@ -1,0 +1,39 @@
+{% set reporting_start = data["metadata"]["reporting_start"] %}
+{% set reporting_stop = data["metadata"]["reporting_stop"] %}
+
+<div class="row">
+  <!-- /.col-lg-6 (nested) -->
+  <div class="panel panel-default">
+    <div class="panel-heading">
+      Reporting header
+    </div>
+    {% if reporting_start != None and reporting_stop != None %}
+    <div class="panel-body" id="reporting-period-details">
+      <div>
+        <h3><u>Reporting period details</u></h3>
+      </div>
+      <div class="row row2">
+        <table align="left" class="table table-striped table-bordered table-hover table-static" id="header-table">
+          <tr>
+            <td></td>
+            <th>Period start</th>
+            <th>Period stop</th>
+          </tr>
+          <tr>
+            <th>Time information</th>
+            <td id="header-content-date-start">{{ reporting_start }}</td>
+            <td id="header-content-date-stop">{{ reporting_stop }}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+    {% else %}
+    <div>
+      <br/>
+      <p style="text-indent: 1em">There is not enough information for setting the reporting header.</p>
+      <br/>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
